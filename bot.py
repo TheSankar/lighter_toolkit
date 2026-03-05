@@ -19,7 +19,7 @@ MARKETS = {
     120: "LIT",
 }
 
-UPDATE_INTERVAL_SECONDS = 5
+UPDATE_INTERVAL_SECONDS = 15
 WS_URL = "wss://mainnet.zklighter.elliot.ai/stream?readonly=true"
 TG_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
@@ -131,7 +131,7 @@ def handle(raw):
 
 
 async def ws_loop():
-    delay = 15
+    delay = 5
     while True:
         try:
             log.info("Connecting to Lighter WebSocket...")
