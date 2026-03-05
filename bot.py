@@ -22,7 +22,7 @@ MARKETS = {
 }
 
 UPDATE_INTERVAL_SECONDS = 5     # how often to edit the message
-WS_URL = "wss://mainnet.zklighter.elliot.ai/stream"
+WS_URL = "wss://mainnet.zklighter.elliot.ai/stream?readonly=true"
 TG_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 # ─────────────────────────────────────────────────────────
