@@ -1,33 +1,31 @@
 import asyncio
 import json
 import logging
+import os
 import requests
 import websockets
-from datetime import datetime, timezone
 
-# ─────────────────────────────────────────────────────────
+# ---------------------------------------------------------
 # ENVIRONMENT VARIABLES — set these in Railway dashboard
-# ─────────────────────────────────────────────────────────
-import os
+# ---------------------------------------------------------
 BOT_TOKEN  = os.environ.get("BOT_TOKEN",  "YOUR_BOT_TOKEN_HERE")
 CHANNEL_ID = os.environ.get("CHANNEL_ID", "YOUR_CHANNEL_ID_HERE")
 
-# ─────────────────────────────────────────────────────────
+# ---------------------------------------------------------
 # CONFIG
-# ─────────────────────────────────────────────────────────
-# Lighter market IDs  (confirmed from /api/v1/orderBookDetails)
+# ---------------------------------------------------------
 MARKETS = {
     1:   "BTC",
     120: "LIT",
 }
 
-UPDATE_INTERVAL_SECONDS = 5     # how often to edit the message
+UPDATE_INTERVAL_SECONDS = 5
 WS_URL = "wss://mainnet.zklighter.elliot.ai/stream?readonly=true"
 TG_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
-# ─────────────────────────────────────────────────────────
+# ---------------------------------------------------------
 # LOGGING
-# ─────────────────────────────────────────────────────────
+# ---------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)s  %(message)s",
@@ -35,17 +33,16 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-# ─────────────────────────────────────────────────────────
+# ---------------------------------------------------------
 # STATE
-# ─────────────────────────────────────────────────────────
-market_data: dict[str, dict] = {}   # "BTC" → {"price": 69102.24, "change": -1.23}
-pinned_msg_id: int | None = None
+# ---------------------------------------------------------
+market_data = {}   # "BTC" -> {"price": 69102.24, "change": -1.23}
 
 
-# ─────────────────────────────────────────────────────────
+# ---------------------------------------------------------
 # TELEGRAM
-# ─────────────────────────────────────────────────────────
-def tg(method: str, payload: dict) -> dict | None:
+# ---------------------------------------------------------
+def tg(method, payload):
     try:
         r = requests.post(f"{TG_API}/{method}", json=payload, timeout=10)
         body = r.json()
@@ -59,7 +56,7 @@ def tg(method: str, payload: dict) -> dict | None:
         return None
 
 
-def send_msg(text: str) -> int | None:
+def send_msg(text):
     res = tg("sendMessage", {
         "chat_id": CHANNEL_ID,
         "text": text,
@@ -71,26 +68,11 @@ def send_msg(text: str) -> int | None:
     return None
 
 
-def edit_msg(msg_id: int, text: str) -> bool:
-    res = tg("editMessageText", {
-        "chat_id": CHANNEL_ID,
-        "message_id": msg_id,
-        "text": text,
-        "parse_mode": "HTML",
-        "disable_web_page_preview": True,
-    })
-    if res is None:
-        return False
-    if not res.get("ok") and "not modified" in res.get("description", "").lower():
-        return True
-    return bool(res.get("ok"))
-
-
-# ─────────────────────────────────────────────────────────
-# MESSAGE BUILDER
-# ─────────────────────────────────────────────────────────
-def fmt_price(symbol: str, price: float) -> str:
-    if price >= 1_000:
+# ---------------------------------------------------------
+# MESSAGE BUILDER  — clean, no header, no footer
+# ---------------------------------------------------------
+def fmt_price(symbol, price):
+    if price >= 1000:
         return f"${price:,.2f}"
     elif price >= 1:
         return f"${price:,.3f}"
@@ -98,38 +80,29 @@ def fmt_price(symbol: str, price: float) -> str:
         return f"${price:,.4f}"
 
 
-def build_message() -> str:
-    now = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
-    lines = [f"⚡ <b>Lighter Prices</b>  <code>{now}</code>\n"]
-
+def build_message():
+    lines = []
     for symbol in ["BTC", "LIT"]:
         d = market_data.get(symbol)
         if not d:
-            lines.append(f"<b>{symbol}</b>  —  loading…")
             continue
-
-        price = d["price"]
-        chg   = d.get("change")
-
+        price     = d["price"]
+        chg       = d.get("change")
         price_str = fmt_price(symbol, price)
-
         if chg is not None:
-            arrow   = "🔺" if chg >= 0 else "🔻"
+            arrow   = "\U0001f53a" if chg >= 0 else "\U0001f53b"
             sign    = "+" if chg >= 0 else ""
             chg_str = f"{arrow} {sign}{chg:.2f}%"
         else:
-            chg_str = "—"
-
-        lines.append(f"<b>{symbol}</b>  —  {price_str}  •  24h: {chg_str}")
-
-    lines.append(f"\n<i>Lighter.xyz perps  ·  live every {UPDATE_INTERVAL_SECONDS}s</i>")
+            chg_str = "-"
+        lines.append(f"<b>{symbol}</b>  \u2014  {price_str}  \u2022  24h: {chg_str}")
     return "\n".join(lines)
 
 
-# ─────────────────────────────────────────────────────────
+# ---------------------------------------------------------
 # WEBSOCKET LISTENER
-# ─────────────────────────────────────────────────────────
-def handle(raw: str):
+# ---------------------------------------------------------
+def handle(raw):
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
@@ -161,69 +134,57 @@ async def ws_loop():
     delay = 5
     while True:
         try:
-            log.info("Connecting to Lighter WebSocket…")
+            log.info("Connecting to Lighter WebSocket...")
             async with websockets.connect(WS_URL, ping_interval=20, ping_timeout=10) as ws:
-                log.info("Connected ✅")
+                log.info("Connected")
                 delay = 5
                 for market_id in MARKETS:
                     await ws.send(json.dumps({
                         "type": "subscribe",
                         "channel": f"market_stats/{market_id}"
                     }))
-                    log.info(f"  → subscribed market_stats/{market_id} ({MARKETS[market_id]})")
+                    log.info(f"  -> subscribed market_stats/{market_id} ({MARKETS[market_id]})")
                 async for raw in ws:
                     handle(raw)
         except (websockets.exceptions.ConnectionClosed,
                 websockets.exceptions.WebSocketException, OSError) as e:
-            log.warning(f"WS disconnected: {e} — retry in {delay}s")
+            log.warning(f"WS disconnected: {e} - retry in {delay}s")
             await asyncio.sleep(delay)
             delay = min(delay * 2, 60)
         except Exception as e:
-            log.error(f"WS error: {e} — retry in {delay}s")
+            log.error(f"WS error: {e} - retry in {delay}s")
             await asyncio.sleep(delay)
 
 
-# ─────────────────────────────────────────────────────────
-# TICKER LOOP  (posts + edits message every N seconds)
-# ─────────────────────────────────────────────────────────
+# ---------------------------------------------------------
+# TICKER LOOP  — sends a NEW message every 5 seconds
+# ---------------------------------------------------------
 async def ticker_loop():
-    global pinned_msg_id
-
-    log.info("Waiting for first price data…")
+    log.info("Waiting for first price data...")
     for _ in range(30):
         if len(market_data) >= 2:
             break
         await asyncio.sleep(1)
 
     if not market_data:
-        log.error("No data received after 30s — check WS / market IDs")
-        return
-
-    pinned_msg_id = send_msg(build_message())
-    if pinned_msg_id:
-        log.info(f"Ticker posted (msg_id={pinned_msg_id}) ✅")
-    else:
-        log.error("Failed to post initial message")
+        log.error("No data received after 30s - check WS / market IDs")
         return
 
     while True:
+        msg = build_message()
+        if msg:
+            send_msg(msg)
         await asyncio.sleep(UPDATE_INTERVAL_SECONDS)
-        ok = edit_msg(pinned_msg_id, build_message())
-        if not ok:
-            log.warning("Edit failed — reposting")
-            pinned_msg_id = send_msg(build_message())
 
 
-# ─────────────────────────────────────────────────────────
+# ---------------------------------------------------------
 # MAIN
-# ─────────────────────────────────────────────────────────
+# ---------------------------------------------------------
 async def main():
-    log.info("━" * 44)
-    log.info("  Lighter Live Ticker Bot  (BTC + LIT)")
-    log.info("━" * 44)
+    log.info("Lighter Live Ticker Bot  (BTC + LIT)")
 
     if "YOUR_" in BOT_TOKEN or "YOUR_" in CHANNEL_ID:
-        log.error("❌  Set BOT_TOKEN and CHANNEL_ID env vars before running!")
+        log.error("Set BOT_TOKEN and CHANNEL_ID env vars before running!")
         return
 
     await asyncio.gather(ws_loop(), ticker_loop())
