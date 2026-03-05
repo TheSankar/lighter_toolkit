@@ -95,7 +95,7 @@ def build_message():
             chg_str = f"{arrow} {sign}{chg:.2f}%"
         else:
             chg_str = "-"
-        lines.append(f"<b>{symbol}</b>  \u2014  {price_str}  \u2022  24h: {chg_str}")
+        lines.append(f"<b>{symbol}</b>  \u2014  {price_str}
     return "\n".join(lines)
 
 
