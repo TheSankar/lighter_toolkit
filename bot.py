@@ -131,7 +131,7 @@ def handle(raw):
 
 
 async def ws_loop():
-    delay = 5
+    delay = 15
     while True:
         try:
             log.info("Connecting to Lighter WebSocket...")
