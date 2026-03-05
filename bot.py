@@ -2,59 +2,97 @@ import requests
 import time
 import os
 
-TOKEN = os.environ["BOT_TOKEN"]
-CHAT_ID = os.environ["CHAT_ID"]
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
 
-message_id = None
+UPDATE_INTERVAL = 5
 
-def get_price():
-    url = "https://api.coingecko.com/api/v3/simple/price?ids=litentry&vs_currencies=usd&include_24hr_change=true"
-    data = requests.get(url).json()
+LIGHTER_API = "https://mainnet.zklighter.elliot.ai/api/v1/markets"
 
-    price = data["litentry"]["usd"]
-    change = data["litentry"]["usd_24h_change"]
 
-    return price, change
+def get_prices():
+    try:
+        r = requests.get(LIGHTER_API, timeout=10)
+        data = r.json()
+
+        btc_price = None
+        btc_change = None
+        lit_price = None
+        lit_change = None
+
+        for market in data["markets"]:
+
+            if market["symbol"] == "BTC-USD":
+                btc_price = float(market["markPrice"])
+                btc_change = float(market["priceChangePercent24h"])
+
+            if market["symbol"] == "LIT-USD":
+                lit_price = float(market["markPrice"])
+                lit_change = float(market["priceChangePercent24h"])
+
+        return btc_price, btc_change, lit_price, lit_change
+
+    except Exception as e:
+        print("API Error:", e)
+        return None, None, None, None
+
+
+def format_price(symbol, price, change):
+
+    if price is None:
+        return f"{symbol} - loading..."
+
+    arrow = "🔺" if change >= 0 else "🔻"
+
+    return f"{symbol} - ${price:,.2f} • 24h: {arrow} {change:.2f}%"
 
 
 def send_message(text):
-    global message_id
 
-    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
-    r = requests.post(url, data={
+    payload = {
         "chat_id": CHAT_ID,
         "text": text
-    }).json()
+    }
 
-    message_id = r["result"]["message_id"]
+    r = requests.post(url, json=payload)
+
+    return r.json()["result"]["message_id"]
 
 
-def edit_message(text):
+def edit_message(message_id, text):
 
-    url = f"https://api.telegram.org/bot{TOKEN}/editMessageText"
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/editMessageText"
 
-    requests.post(url, data={
+    payload = {
         "chat_id": CHAT_ID,
         "message_id": message_id,
         "text": text
-    })
+    }
+
+    requests.post(url, json=payload)
+
+
+btc, btc_c, lit, lit_c = get_prices()
+
+text = f"""
+{format_price("BTC", btc, btc_c)}
+{format_price("LIT", lit, lit_c)}
+"""
+
+message_id = send_message(text)
 
 
 while True:
 
-    price, change = get_price()
+    btc, btc_c, lit, lit_c = get_prices()
 
-    text = f"${price:.3f} • 24h: {change:.2f}%"
+    text = f"""
+{format_price("BTC", btc, btc_c)}
+{format_price("LIT", lit, lit_c)}
+"""
 
-    if message_id is None:
-        send_message(text)
-    else:
-        edit_message(text)
+    edit_message(message_id, text)
 
-    time.sleep(5)
-
-    send_message(message)
-
-    time.sleep(60)
-
+    time.sleep(UPDATE_INTERVAL)
