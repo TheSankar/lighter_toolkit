@@ -19,7 +19,7 @@ MARKETS = {
     120: "LIT",
 }
 
-UPDATE_INTERVAL_SECONDS = 15
+UPDATE_INTERVAL_SECONDS = 30
 WS_URL = "wss://mainnet.zklighter.elliot.ai/stream?readonly=true"
 TG_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
