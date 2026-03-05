@@ -30,7 +30,7 @@ LIQUIDATION_MARKETS = {
 
 MIN_LIQUIDATION_USD  = 40_000   # only alert if liquidation >= $40k
 LIQUIDATION_POLL_SEC = 15       # how often to check for new liquidations
-UPDATE_INTERVAL_SECONDS = 15    # price message interval
+UPDATE_INTERVAL_SECONDS = 45    # price message interval
 
 REST_URL = "https://mainnet.zklighter.elliot.ai"
 WS_URL   = "wss://mainnet.zklighter.elliot.ai/stream?readonly=true"
