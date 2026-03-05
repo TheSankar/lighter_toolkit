@@ -12,13 +12,37 @@ LIGHTER_API = "https://mainnet.zklighter.elliot.ai/api/v1/markets"
 
 def get_prices():
     try:
-        r = requests.get(LIGHTER_API, timeout=10)
+        url = "https://mainnet.zklighter.elliot.ai/api/v1/markets"
+
+        r = requests.get(url, timeout=10)
+        print(r.text)
+
+        if r.status_code != 200:
+            print("Bad API status:", r.status_code)
+            return None, None, None, None
+
         data = r.json()
 
         btc_price = None
         btc_change = None
         lit_price = None
         lit_change = None
+
+        for market in data.get("markets", []):
+
+            if market["symbol"] == "BTC-USD":
+                btc_price = float(market["markPrice"])
+                btc_change = float(market["priceChangePercent24h"])
+
+            if market["symbol"] == "LIT-USD":
+                lit_price = float(market["markPrice"])
+                lit_change = float(market["priceChangePercent24h"])
+
+        return btc_price, btc_change, lit_price, lit_change
+
+    except Exception as e:
+        print("API Error:", e)
+        return None, None, None, None
 
         for market in data["markets"]:
 
